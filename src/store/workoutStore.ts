@@ -23,6 +23,7 @@ interface WorkoutDay {
 
 interface CustomWorkoutPlan {
   id: string;
+  databaseId?: string; // Database ID for deletion
   name: string;
   description: string;
   difficultyLevel: 'beginner' | 'intermediate' | 'advanced';
@@ -37,6 +38,7 @@ interface WorkoutStore {
   customPlans: CustomWorkoutPlan[];
   addCustomPlan: (plan: Omit<CustomWorkoutPlan, 'id' | 'createdAt'>) => void;
   removeCustomPlan: (planId: string) => void;
+  setCustomPlans: (plans: CustomWorkoutPlan[]) => void;
   clearAllData: () => void;
   // Removed syncWithDatabase and uploadToDatabase to avoid require cycles
 }
@@ -60,14 +62,41 @@ export const useWorkoutStore = create<WorkoutStore>()(
         // Upload to database if user is authenticated
         const authStore = useAuthStore.getState();
         if (authStore.user?.id) {
-          // Upload handled by authStore
+          // Import dataSyncService dynamically to avoid require cycles
+          const { dataSyncService } = require('../services/dataSync');
+          dataSyncService.uploadCustomWorkoutPlan(authStore.user.id, newPlan).then((databaseId) => {
+            if (databaseId) {
+              // Update the plan with database ID
+              set((state) => ({
+                customPlans: state.customPlans.map(p => 
+                  p.id === newPlan.id ? { ...p, databaseId } : p
+                ),
+              }));
+            }
+          });
         }
       },
       
       removeCustomPlan: (planId) => {
-        set((state) => ({
-          customPlans: state.customPlans.filter(plan => plan.id !== planId),
-        }));
+        set((state) => {
+          const planToDelete = state.customPlans.find(plan => plan.id === planId);
+          console.log('🗑️ Deleting plan:', { planId, planToDelete });
+          const authStore = useAuthStore.getState();
+          if (authStore.user?.id && planToDelete?.databaseId) {
+            console.log('🗑️ Deleting from database:', planToDelete.databaseId);
+            const { dataSyncService } = require('../services/dataSync');
+            dataSyncService.deleteCustomWorkoutPlan(authStore.user.id, planToDelete.databaseId);
+          } else {
+            console.log('⚠️ Cannot delete from database:', { userId: authStore.user?.id, databaseId: planToDelete?.databaseId });
+          }
+          return {
+            customPlans: state.customPlans.filter(plan => plan.id !== planId),
+          };
+        });
+      },
+
+      setCustomPlans: (plans) => {
+        set({ customPlans: plans });
       },
 
       clearAllData: () => {

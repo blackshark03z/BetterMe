@@ -65,6 +65,9 @@ export default function WorkoutSessionScreen() {
     
     // Get exercise data based on exerciseId and planName
     const getExerciseById = (id: string, plan: string) => {
+      
+      console.log('🔍 getExerciseById called:', { id, plan });
+      
       // First check if it's a custom plan
       const customPlan = customPlans.find(p => p.name === plan);
       if (customPlan) {
@@ -74,6 +77,7 @@ export default function WorkoutSessionScreen() {
           .find(ex => ex.id === id);
         
         if (customExercise) {
+          console.log('✅ Found custom exercise:', customExercise);
           return {
             id: customExercise.id,
             name: customExercise.name,
@@ -116,6 +120,7 @@ export default function WorkoutSessionScreen() {
       
       const exerciseData = exercises[id as keyof typeof exercises];
       if (exerciseData) {
+        console.log('✅ Found predefined exercise:', exerciseData);
         return {
           id,
           name: exerciseData.name,
@@ -127,6 +132,8 @@ export default function WorkoutSessionScreen() {
           completedSets: 0,
         };
       }
+      
+      console.log('❌ Exercise not found, using fallback');
       
       // Final fallback
       return {
@@ -212,9 +219,18 @@ export default function WorkoutSessionScreen() {
     const newCompletedSets = completedSets + 1;
     setCompletedSets(newCompletedSets);
     
-    // Add current set time to total
-    const currentSetTime = workoutTime + restTime;
-    setTotalWorkoutTime(prev => prev + currentSetTime);
+    // Add current set time to total (only workout time, not rest time)
+    if (workoutTime > 0) {
+      console.log('Set completion debug:', {
+        set: newCompletedSets,
+        workoutTime,
+        restTime,
+        currentSetTime: workoutTime, // Only workout time
+        previousTotal: totalWorkoutTime,
+        newTotal: totalWorkoutTime + workoutTime
+      });
+      setTotalWorkoutTime(prev => prev + workoutTime);
+    }
     
     if (newCompletedSets >= currentExercise.sets) {
       // Exercise completed - show next exercise dialog
@@ -241,8 +257,24 @@ export default function WorkoutSessionScreen() {
       const currentExercise = session.exercises[session.currentExerciseIndex];
       const planName = params.planName as string;
       
-      // Use accumulated total time for the exercise
-      const finalTotalTime = totalWorkoutTime + workoutTime + restTime; // Include current set if timer is running
+      // Use accumulated total time for the exercise (only workout time)
+      let finalTotalTime = totalWorkoutTime; // Start with accumulated workout time
+      
+      // Add current set workout time if timer is running
+      if (isWorkoutTimerRunning) {
+        finalTotalTime += workoutTime;
+      }
+      
+      // Only count workout time, not rest time
+      console.log('Time calculation debug:', {
+        workoutTime,
+        restTime,
+        totalWorkoutTime,
+        finalTotalTime,
+        isWorkoutTimerRunning,
+        isRestTimerRunning,
+        note: 'Only workout time is counted for duration'
+      });
       
       console.log('Timer Debug:', {
         workoutTime,
@@ -263,10 +295,11 @@ export default function WorkoutSessionScreen() {
           exerciseName: currentExercise.name,
           sets: currentExercise.sets,
           workoutTime, // current set workout time
-          restTime, // current set rest time
-          totalWorkoutTime, // accumulated time from previous sets
-          finalTotalTime, // total time for entire exercise
+          restTime, // current set rest time (not counted)
+          totalWorkoutTime, // accumulated workout time from previous sets
+          finalTotalTime, // total workout time for entire exercise
           totalCalories,
+          note: 'Only workout time is saved to session'
         });
         
         addSession({

@@ -34,10 +34,46 @@ export default function ProgressScreen() {
     totalWorkouts: progress.totalWorkouts,
     calculatedProgress: (weeklyStats.workoutsThisWeek / progress.weeklyGoal) * 100,
   });
+  
+  // Debug all sessions
+  console.log('All Sessions Debug:', {
+    totalSessions: sessions.length,
+    sessions: sessions.map(s => ({
+      id: s.id,
+      exerciseName: s.exerciseName,
+      duration: s.duration, // in seconds
+      durationInMinutes: s.duration / 60,
+      date: s.date,
+    })),
+    weeklyStats: {
+      workoutsThisWeek: weeklyStats.workoutsThisWeek,
+      totalDuration: weeklyStats.totalDuration, // in minutes
+      totalCalories: weeklyStats.totalCalories,
+    }
+  });
+  
+  // Debug recent sessions display
+  console.log('Recent Sessions Display Debug:', {
+    sessionsToShow: sessions.slice(0, 10).map(s => ({
+      exerciseName: s.exerciseName,
+      planName: s.planName,
+      duration: s.duration,
+      date: s.date,
+    })),
+    totalSessions: sessions.length,
+    note: 'Now showing top 10 sessions instead of 5'
+  });
+
 
   const formatDuration = (minutes: number) => {
+    // Handle very small durations (less than 1 minute)
+    if (minutes < 1) {
+      const seconds = Math.round(minutes * 60);
+      return `${seconds}s`;
+    }
+    
     const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    const mins = Math.floor(minutes % 60);
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
@@ -289,7 +325,7 @@ export default function ProgressScreen() {
               </Text>
             </Card>
           ) : (
-            sessions.slice(0, 5).map((session) => (
+            sessions.slice(0, 10).map((session) => (
               <Card key={session.id} variant="outlined" padding="md" style={styles.sessionCard}>
                 <View style={styles.sessionHeader}>
                   <View style={styles.sessionInfo}>

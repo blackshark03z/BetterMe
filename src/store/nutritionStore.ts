@@ -199,6 +199,9 @@ export const useNutritionStore = create<NutritionData & {
   removeMeal: (id: string) => void;
   addWaterLog: (amount: number) => void;
   updateGoals: (goals: Partial<NutritionGoals>) => void;
+  setMeals: (meals: Meal[]) => void;
+  setWaterLogs: (logs: WaterLog[]) => void;
+  setGoals: (goals: NutritionGoals) => void;
   getTodayNutrition: () => {
     totalCalories: number;
     totalProtein: number;
@@ -400,6 +403,18 @@ export const useNutritionStore = create<NutritionData & {
           .sort((a, b) => b.priority - a.priority);
         
         return recommendations.slice(0, 5); // Return top 5 recommendations
+      },
+
+      setMeals: (meals) => {
+        set({ meals });
+      },
+
+      setWaterLogs: (logs) => {
+        set({ waterLogs: logs });
+      },
+
+      setGoals: (goals) => {
+        set({ goals });
       },
 
       resetNutritionData: () => {

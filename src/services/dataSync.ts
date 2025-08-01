@@ -17,7 +17,8 @@ export interface DataSyncService {
 
   // Custom Workout Plans Sync
   syncCustomWorkoutPlans: (userId: string, onSuccess?: (plans: any[]) => void) => Promise<void>;
-  uploadCustomWorkoutPlan: (userId: string, plan: any) => Promise<void>;
+  uploadCustomWorkoutPlan: (userId: string, plan: any) => Promise<string | null>;
+  deleteCustomWorkoutPlan: (userId: string, planId: string) => Promise<void>;
 
   // Full Sync
   syncAllData: (userId: string, callbacks: {
@@ -54,17 +55,26 @@ class DataSyncServiceImpl implements DataSyncService {
       }
 
       if (data) {
-        const sessions = data.map(row => ({
-          id: row.id,
-          planName: row.plan_name,
-          exerciseName: row.exercise_name,
-          duration: row.duration,
-          sets: row.sets,
-          reps: row.reps,
-          completedSets: row.completed_sets,
-          caloriesBurned: row.calories_burned,
-          date: new Date(row.session_date),
-        }));
+        const sessions = data.map(row => {
+          const sessionDate = new Date(row.session_date);
+          console.log('🔄 Converting session date:', {
+            original: row.session_date,
+            converted: sessionDate.toISOString(),
+            isValid: !isNaN(sessionDate.getTime()),
+          });
+          
+          return {
+            id: row.id,
+            planName: row.plan_name,
+            exerciseName: row.exercise_name,
+            duration: row.duration,
+            sets: row.sets,
+            reps: row.reps,
+            completedSets: row.completed_sets,
+            caloriesBurned: row.calories_burned,
+            date: sessionDate,
+          };
+        });
 
         onSuccess?.(sessions);
         console.log('✅ Synced workout sessions:', sessions.length);
@@ -110,6 +120,21 @@ class DataSyncServiceImpl implements DataSyncService {
 
   async uploadWorkoutSession(userId: string, session: any): Promise<void> {
     try {
+      // Check if session already exists to avoid duplicates
+      const { data: existingSession } = await supabase
+        .from('workout_sessions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('exercise_name', session.exerciseName)
+        .eq('session_date', session.date.toISOString())
+        .eq('duration', session.duration)
+        .single();
+
+      if (existingSession) {
+        console.log('⚠️ Session already exists, skipping upload');
+        return;
+      }
+
       const { error } = await supabase
         .from('workout_sessions')
         .insert({
@@ -136,6 +161,19 @@ class DataSyncServiceImpl implements DataSyncService {
 
   async uploadBodyStats(userId: string, stats: any): Promise<void> {
     try {
+      // Check if stats already exists to avoid duplicates
+      const { data: existingStats } = await supabase
+        .from('body_stats')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('stats_date', stats.date.toISOString())
+        .single();
+
+      if (existingStats) {
+        console.log('⚠️ Body stats already exists for this date, skipping upload');
+        return;
+      }
+
       const { error } = await supabase
         .from('body_stats')
         .insert({
@@ -254,6 +292,21 @@ class DataSyncServiceImpl implements DataSyncService {
 
   async uploadNutritionMeal(userId: string, meal: any): Promise<void> {
     try {
+      // Check if meal already exists to avoid duplicates
+      const { data: existingMeal } = await supabase
+        .from('nutrition_meals')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('name', meal.name)
+        .eq('logged_at', meal.loggedAt.toISOString())
+        .eq('meal_type', meal.mealType)
+        .single();
+
+      if (existingMeal) {
+        console.log('⚠️ Meal already exists, skipping upload');
+        return;
+      }
+
       const { error } = await supabase
         .from('nutrition_meals')
         .insert({
@@ -284,6 +337,20 @@ class DataSyncServiceImpl implements DataSyncService {
 
   async uploadWaterLog(userId: string, waterLog: any): Promise<void> {
     try {
+      // Check if water log already exists to avoid duplicates
+      const { data: existingLog } = await supabase
+        .from('nutrition_water_logs')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('logged_at', waterLog.loggedAt.toISOString())
+        .eq('amount', waterLog.amount)
+        .single();
+
+      if (existingLog) {
+        console.log('⚠️ Water log already exists, skipping upload');
+        return;
+      }
+
       const { error } = await supabase
         .from('nutrition_water_logs')
         .insert({
@@ -346,8 +413,9 @@ class DataSyncServiceImpl implements DataSyncService {
       }
 
       if (data) {
-        const plans = data.map(row => ({
-          id: row.id,
+        const plans = data.map((row, index) => ({
+          id: `plan-${Date.now()}-${index}`, // Generate unique local ID
+          databaseId: row.id, // Store database ID for deletion
           name: row.name,
           description: row.description,
           difficultyLevel: row.difficulty_level as 'beginner' | 'intermediate' | 'advanced',
@@ -360,15 +428,26 @@ class DataSyncServiceImpl implements DataSyncService {
 
         onSuccess?.(plans);
         console.log('✅ Synced custom workout plans:', plans.length);
+        console.log('🔍 Synced plans:', plans.map(p => ({ id: p.id, databaseId: p.databaseId, name: p.name })));
       }
     } catch (error) {
       console.error('❌ Error syncing custom workout plans:', error);
     }
   }
 
-  async uploadCustomWorkoutPlan(userId: string, plan: any): Promise<void> {
+  async uploadCustomWorkoutPlan(userId: string, plan: any): Promise<string | null> {
     try {
-      const { error } = await supabase
+      const { data: existingPlans } = await supabase
+        .from('custom_workout_plans')
+        .select('id, name, created_at')
+        .eq('user_id', userId)
+        .eq('name', plan.name); // Improved duplicate check
+      if (existingPlans && existingPlans.length > 0) {
+        console.log('⚠️ Custom workout plan already exists, skipping upload');
+        console.log('🔍 Found existing plans:', existingPlans.map(p => ({ id: p.id, name: p.name })));
+        return existingPlans[0].id;
+      }
+      const { data, error } = await supabase
         .from('custom_workout_plans')
         .insert({
           user_id: userId,
@@ -379,15 +458,37 @@ class DataSyncServiceImpl implements DataSyncService {
           days_per_week: plan.daysPerWeek,
           estimated_duration: plan.estimatedDuration,
           workout_days: plan.workoutDays,
-        });
-
+        })
+        .select('id')
+        .single();
       if (error) {
         console.error('❌ Error uploading custom workout plan:', error);
+        return null;
       } else {
-        console.log('✅ Uploaded custom workout plan');
+        console.log('✅ Uploaded custom workout plan with ID:', data.id);
+        return data.id;
       }
     } catch (error) {
       console.error('❌ Error uploading custom workout plan:', error);
+      return null;
+    }
+  }
+
+  async deleteCustomWorkoutPlan(userId: string, planId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('custom_workout_plans')
+        .delete()
+        .eq('user_id', userId)
+        .eq('id', planId);
+
+      if (error) {
+        console.error('❌ Error deleting custom workout plan:', error);
+      } else {
+        console.log('✅ Deleted custom workout plan');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting custom workout plan:', error);
     }
   }
 
