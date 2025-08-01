@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface WorkoutSession {
   id: string;
@@ -35,121 +37,129 @@ interface ProgressStore {
   };
 }
 
-export const useProgressStore = create<ProgressStore>((set, get) => ({
-  sessions: [],
-  progress: {
-    totalWorkouts: 0,
-    totalDuration: 0,
-    totalCalories: 0,
-    streakDays: 0,
-    weeklyGoal: 3,
-    weeklyProgress: 0,
-  },
+export const useProgressStore = create<ProgressStore>()(
+  persist(
+    (set, get) => ({
+      sessions: [],
+      progress: {
+        totalWorkouts: 0,
+        totalDuration: 0,
+        totalCalories: 0,
+        streakDays: 0,
+        weeklyGoal: 3,
+        weeklyProgress: 0,
+      },
 
-  addSession: (sessionData) => {
-    const newSession: WorkoutSession = {
-      ...sessionData,
-      id: `session-${Date.now()}`,
-      date: new Date(),
-    };
+      addSession: (sessionData) => {
+        const newSession: WorkoutSession = {
+          ...sessionData,
+          id: `session-${Date.now()}`,
+          date: new Date(),
+        };
 
-    set((state) => ({
-      sessions: [...state.sessions, newSession],
-    }));
+        set((state) => ({
+          sessions: [...state.sessions, newSession],
+        }));
 
-    // Update progress after adding session
-    get().updateProgress();
-  },
+        // Update progress after adding session
+        get().updateProgress();
+      },
 
-  updateProgress: () => {
-    const { sessions } = get();
-    
-    if (sessions.length === 0) return;
+      updateProgress: () => {
+        const { sessions } = get();
+        
+        if (sessions.length === 0) return;
 
-    // Calculate total stats
-    const totalWorkouts = sessions.length;
-    const totalDuration = sessions.reduce((sum, session) => sum + session.duration, 0) / 60; // Convert to minutes
-    const totalCalories = sessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0);
+        // Calculate total stats
+        const totalWorkouts = sessions.length;
+        const totalDuration = sessions.reduce((sum, session) => sum + session.duration, 0) / 60; // Convert to minutes
+        const totalCalories = sessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0);
 
-    // Calculate streak - Group sessions by date and count unique days
-    const sortedSessions = [...sessions].sort((a, b) => b.date.getTime() - a.date.getTime());
-    let streakDays = 0;
-    let currentDate = new Date();
-    const processedDates = new Set<string>();
-    
-    for (const session of sortedSessions) {
-      const sessionDate = new Date(session.date);
-      const sessionDateString = sessionDate.toDateString(); // Get date without time
-      const daysDiff = Math.floor((currentDate.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Only count each date once for streak calculation
-      if (daysDiff <= 1 && !processedDates.has(sessionDateString)) {
-        streakDays++;
-        processedDates.add(sessionDateString);
-        currentDate = sessionDate;
-      } else if (daysDiff > 1) {
-        break;
-      }
+        // Calculate streak - Group sessions by date and count unique days
+        const sortedSessions = [...sessions].sort((a, b) => b.date.getTime() - a.date.getTime());
+        let streakDays = 0;
+        let currentDate = new Date();
+        const processedDates = new Set<string>();
+        
+        for (const session of sortedSessions) {
+          const sessionDate = new Date(session.date);
+          const sessionDateString = sessionDate.toDateString(); // Get date without time
+          const daysDiff = Math.floor((currentDate.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Only count each date once for streak calculation
+          if (daysDiff <= 1 && !processedDates.has(sessionDateString)) {
+            streakDays++;
+            processedDates.add(sessionDateString);
+            currentDate = sessionDate;
+          } else if (daysDiff > 1) {
+            break;
+          }
+        }
+
+        // Calculate weekly progress
+        const weekStart = new Date();
+        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+
+        // Sửa: Đếm số ngày duy nhất có tập trong tuần
+        const workoutsThisWeekSessions = sessions.filter(session => {
+          const sessionDate = new Date(session.date);
+          return sessionDate >= weekStart && sessionDate <= weekEnd;
+        });
+        const uniqueWorkoutDays = new Set(workoutsThisWeekSessions.map(s => new Date(s.date).toDateString()));
+        const workoutsThisWeek = uniqueWorkoutDays.size;
+
+        const { progress } = get();
+        const weeklyProgress = Math.min(workoutsThisWeek / progress.weeklyGoal, 1);
+
+        set((state) => ({
+          progress: {
+            ...state.progress,
+            totalWorkouts,
+            totalDuration,
+            totalCalories,
+            streakDays,
+            lastWorkoutDate: sortedSessions[0]?.date,
+            weeklyProgress,
+          },
+        }));
+      },
+
+      setWeeklyGoal: (goal) => {
+        set((state) => ({
+          progress: {
+            ...state.progress,
+            weeklyGoal: goal,
+          },
+        }));
+      },
+
+      getWeeklyStats: () => {
+        const { sessions } = get();
+        const weekStart = new Date();
+        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+
+        const weeklySessions = sessions.filter(session => {
+          const sessionDate = new Date(session.date);
+          return sessionDate >= weekStart && sessionDate <= weekEnd;
+        });
+        // Đếm số ngày duy nhất
+        const uniqueDays = new Set(weeklySessions.map(s => new Date(s.date).toDateString()));
+        return {
+          workoutsThisWeek: uniqueDays.size,
+          totalDuration: weeklySessions.reduce((sum, session) => sum + session.duration, 0) / 60,
+          totalCalories: weeklySessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0),
+        };
+      },
+    }),
+    {
+      name: 'progress-storage',
+      storage: createJSONStorage(() => AsyncStorage),
     }
-
-    // Calculate weekly progress
-    const weekStart = new Date();
-    weekStart.setHours(0, 0, 0, 0);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-
-    // Sửa: Đếm số ngày duy nhất có tập trong tuần
-    const workoutsThisWeekSessions = sessions.filter(session => {
-      const sessionDate = new Date(session.date);
-      return sessionDate >= weekStart && sessionDate <= weekEnd;
-    });
-    const uniqueWorkoutDays = new Set(workoutsThisWeekSessions.map(s => new Date(s.date).toDateString()));
-    const workoutsThisWeek = uniqueWorkoutDays.size;
-
-    const { progress } = get();
-    const weeklyProgress = Math.min(workoutsThisWeek / progress.weeklyGoal, 1);
-
-    set((state) => ({
-      progress: {
-        ...state.progress,
-        totalWorkouts,
-        totalDuration,
-        totalCalories,
-        streakDays,
-        lastWorkoutDate: sortedSessions[0]?.date,
-        weeklyProgress,
-      },
-    }));
-  },
-
-  setWeeklyGoal: (goal) => {
-    set((state) => ({
-      progress: {
-        ...state.progress,
-        weeklyGoal: goal,
-      },
-    }));
-  },
-
-  getWeeklyStats: () => {
-    const { sessions } = get();
-    const weekStart = new Date();
-    weekStart.setHours(0, 0, 0, 0);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-
-    const weeklySessions = sessions.filter(session => {
-      const sessionDate = new Date(session.date);
-      return sessionDate >= weekStart && sessionDate <= weekEnd;
-    });
-    // Đếm số ngày duy nhất
-    const uniqueDays = new Set(weeklySessions.map(s => new Date(s.date).toDateString()));
-    return {
-      workoutsThisWeek: uniqueDays.size,
-      totalDuration: weeklySessions.reduce((sum, session) => sum + session.duration, 0) / 60,
-      totalCalories: weeklySessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0),
-    };
-  },
-})); 
+  )
+); 

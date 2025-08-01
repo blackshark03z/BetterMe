@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Meal {
   id: string;
@@ -206,112 +208,120 @@ export const useNutritionStore = create<NutritionData & {
   };
   getMealsByType: (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => Meal[];
   getRecommendedMeals: (goal: 'weight_loss' | 'muscle_gain' | 'maintenance', mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack') => RecommendedMeal[];
-}>((set, get) => ({
-  meals: [],
-  waterLogs: [],
-  goals: {
-    dailyCalories: 2000,
-    dailyProtein: 150,
-    dailyCarbs: 200,
-    dailyFat: 65,
-    dailyWater: 2500,
-  },
+}>()(
+  persist(
+    (set, get) => ({
+      meals: [],
+      waterLogs: [],
+      goals: {
+        dailyCalories: 2000,
+        dailyProtein: 150,
+        dailyCarbs: 200,
+        dailyFat: 65,
+        dailyWater: 2500,
+      },
 
-  addMeal: (meal) => {
-    const newMeal: Meal = {
-      ...meal,
-      id: Date.now().toString(),
-      loggedAt: new Date(),
-    };
-    set((state) => ({
-      meals: [...state.meals, newMeal],
-    }));
-  },
+      addMeal: (meal) => {
+        const newMeal: Meal = {
+          ...meal,
+          id: Date.now().toString(),
+          loggedAt: new Date(),
+        };
+        set((state) => ({
+          meals: [...state.meals, newMeal],
+        }));
+      },
 
-  updateMeal: (id, updates) => {
-    set((state) => ({
-      meals: state.meals.map((meal) =>
-        meal.id === id ? { ...meal, ...updates } : meal
-      ),
-    }));
-  },
+      updateMeal: (id, updates) => {
+        set((state) => ({
+          meals: state.meals.map((meal) =>
+            meal.id === id ? { ...meal, ...updates } : meal
+          ),
+        }));
+      },
 
-  removeMeal: (id) => {
-    set((state) => ({
-      meals: state.meals.filter((meal) => meal.id !== id),
-    }));
-  },
+      removeMeal: (id) => {
+        set((state) => ({
+          meals: state.meals.filter((meal) => meal.id !== id),
+        }));
+      },
 
-  addWaterLog: (amount) => {
-    const newWaterLog: WaterLog = {
-      id: Date.now().toString(),
-      amount,
-      loggedAt: new Date(),
-    };
-    set((state) => ({
-      waterLogs: [...state.waterLogs, newWaterLog],
-    }));
-  },
+      addWaterLog: (amount) => {
+        const newWaterLog: WaterLog = {
+          id: Date.now().toString(),
+          amount,
+          loggedAt: new Date(),
+        };
+        set((state) => ({
+          waterLogs: [...state.waterLogs, newWaterLog],
+        }));
+      },
 
-  updateGoals: (newGoals) => {
-    set((state) => ({
-      goals: { ...state.goals, ...newGoals },
-    }));
-  },
+      updateGoals: (newGoals) => {
+        set((state) => ({
+          goals: { ...state.goals, ...newGoals },
+        }));
+      },
 
-  getTodayNutrition: () => {
-    const { meals, waterLogs, goals } = get();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+      getTodayNutrition: () => {
+        const { meals, waterLogs, goals } = get();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    const todayMeals = meals.filter((meal) => {
-      const mealDate = new Date(meal.loggedAt);
-      mealDate.setHours(0, 0, 0, 0);
-      return mealDate.getTime() === today.getTime();
-    });
+        const todayMeals = meals.filter((meal) => {
+          const mealDate = new Date(meal.loggedAt);
+          mealDate.setHours(0, 0, 0, 0);
+          return mealDate.getTime() === today.getTime();
+        });
 
-    const todayWaterLogs = waterLogs.filter((log) => {
-      const logDate = new Date(log.loggedAt);
-      logDate.setHours(0, 0, 0, 0);
-      return logDate.getTime() === today.getTime();
-    });
+        const todayWaterLogs = waterLogs.filter((log) => {
+          const logDate = new Date(log.loggedAt);
+          logDate.setHours(0, 0, 0, 0);
+          return logDate.getTime() === today.getTime();
+        });
 
-    const totalCalories = todayMeals.reduce((sum, meal) => sum + meal.calories, 0);
-    const totalProtein = todayMeals.reduce((sum, meal) => sum + meal.protein, 0);
-    const totalCarbs = todayMeals.reduce((sum, meal) => sum + meal.carbs, 0);
-    const totalFat = todayMeals.reduce((sum, meal) => sum + meal.fat, 0);
-    const totalWater = todayWaterLogs.reduce((sum, log) => sum + log.amount, 0);
+        const totalCalories = todayMeals.reduce((sum, meal) => sum + meal.calories, 0);
+        const totalProtein = todayMeals.reduce((sum, meal) => sum + meal.protein, 0);
+        const totalCarbs = todayMeals.reduce((sum, meal) => sum + meal.carbs, 0);
+        const totalFat = todayMeals.reduce((sum, meal) => sum + meal.fat, 0);
+        const totalWater = todayWaterLogs.reduce((sum, log) => sum + log.amount, 0);
 
-    return {
-      totalCalories,
-      totalProtein,
-      totalCarbs,
-      totalFat,
-      totalWater,
-      calorieProgress: (totalCalories / goals.dailyCalories) * 100,
-      waterProgress: (totalWater / goals.dailyWater) * 100,
-    };
-  },
+        return {
+          totalCalories,
+          totalProtein,
+          totalCarbs,
+          totalFat,
+          totalWater,
+          calorieProgress: (totalCalories / goals.dailyCalories) * 100,
+          waterProgress: (totalWater / goals.dailyWater) * 100,
+        };
+      },
 
-  getMealsByType: (mealType) => {
-    const { meals } = get();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+      getMealsByType: (mealType) => {
+        const { meals } = get();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    return meals.filter((meal) => {
-      const mealDate = new Date(meal.loggedAt);
-      mealDate.setHours(0, 0, 0, 0);
-      return mealDate.getTime() === today.getTime() && meal.mealType === mealType;
-    });
-  },
+        return meals.filter((meal) => {
+          const mealDate = new Date(meal.loggedAt);
+          mealDate.setHours(0, 0, 0, 0);
+          return mealDate.getTime() === today.getTime() && meal.mealType === mealType;
+        });
+      },
 
-  getRecommendedMeals: (goal, mealType) => {
-    let filteredMeals = RECOMMENDED_MEALS.filter((meal) => meal.goal === goal);
-    
-    if (mealType) {
-      filteredMeals = filteredMeals.filter((meal) => meal.mealType === mealType);
+      getRecommendedMeals: (goal, mealType) => {
+        let filteredMeals = RECOMMENDED_MEALS.filter((meal) => meal.goal === goal);
+        
+        if (mealType) {
+          filteredMeals = filteredMeals.filter((meal) => meal.mealType === mealType);
+        }
+        
+        return filteredMeals;
+      },
+    }),
+    {
+      name: 'nutrition-storage',
+      storage: createJSONStorage(() => AsyncStorage),
     }
-    
-    return filteredMeals;
-  },
-})); 
+  )
+); 

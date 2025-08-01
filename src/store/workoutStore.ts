@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Exercise {
   id: string;
@@ -36,24 +38,32 @@ interface WorkoutStore {
   removeCustomPlan: (planId: string) => void;
 }
 
-export const useWorkoutStore = create<WorkoutStore>((set) => ({
-  customPlans: [],
-  
-  addCustomPlan: (plan) => {
-    const newPlan: CustomWorkoutPlan = {
-      ...plan,
-      id: `plan-${Date.now()}`,
-      createdAt: new Date(),
-    };
-    
-    set((state) => ({
-      customPlans: [...state.customPlans, newPlan],
-    }));
-  },
-  
-  removeCustomPlan: (planId) => {
-    set((state) => ({
-      customPlans: state.customPlans.filter(plan => plan.id !== planId),
-    }));
-  },
-})); 
+export const useWorkoutStore = create<WorkoutStore>()(
+  persist(
+    (set) => ({
+      customPlans: [],
+      
+      addCustomPlan: (plan) => {
+        const newPlan: CustomWorkoutPlan = {
+          ...plan,
+          id: `plan-${Date.now()}`,
+          createdAt: new Date(),
+        };
+        
+        set((state) => ({
+          customPlans: [...state.customPlans, newPlan],
+        }));
+      },
+      
+      removeCustomPlan: (planId) => {
+        set((state) => ({
+          customPlans: state.customPlans.filter(plan => plan.id !== planId),
+        }));
+      },
+    }),
+    {
+      name: 'workout-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+); 
