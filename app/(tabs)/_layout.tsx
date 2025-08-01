@@ -72,6 +72,36 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="progress/body-stats"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile/edit"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile/goals"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile/notifications"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile/security"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="nutrition/index"
         options={{
           title: 'Nutrition',

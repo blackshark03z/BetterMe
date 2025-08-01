@@ -29,7 +29,7 @@ export default function SmartRecommendationsScreen() {
       mealType: recommendation.mealType,
     });
 
-    router.back();
+    router.push('/(tabs)/nutrition');
   };
 
   const getGoalIcon = (goal: string) => {

@@ -14,6 +14,18 @@ interface WorkoutSession {
   caloriesBurned?: number;
 }
 
+interface BodyStats {
+  id: string;
+  weight: number;
+  waist: number;
+  hip: number;
+  chest: number;
+  arm: number;
+  bodyFat: number;
+  bmi: number;
+  date: Date;
+}
+
 interface ProgressData {
   totalWorkouts: number;
   totalDuration: number; // in minutes
@@ -26,8 +38,10 @@ interface ProgressData {
 
 interface ProgressStore {
   sessions: WorkoutSession[];
+  bodyStats: BodyStats[];
   progress: ProgressData;
   addSession: (session: Omit<WorkoutSession, 'id' | 'date'>) => void;
+  addBodyStats: (stats: Omit<BodyStats, 'id'>) => void;
   updateProgress: () => void;
   setWeeklyGoal: (goal: number) => void;
   getWeeklyStats: () => {
@@ -35,12 +49,14 @@ interface ProgressStore {
     totalDuration: number;
     totalCalories: number;
   };
+  resetStore: () => void;
 }
 
 export const useProgressStore = create<ProgressStore>()(
   persist(
     (set, get) => ({
       sessions: [],
+      bodyStats: [],
       progress: {
         totalWorkouts: 0,
         totalDuration: 0,
@@ -65,16 +81,38 @@ export const useProgressStore = create<ProgressStore>()(
         get().updateProgress();
       },
 
+      addBodyStats: (statsData) => {
+        const newStats: BodyStats = {
+          ...statsData,
+          id: `stats-${Date.now()}`,
+        };
+
+        set((state) => ({
+          bodyStats: [...state.bodyStats, newStats],
+        }));
+      },
+
       updateProgress: () => {
         const { sessions } = get();
         
         if (sessions.length === 0) return;
 
-        // Ensure all session dates are Date objects
-        const normalizedSessions = sessions.map(session => ({
-          ...session,
-          date: session.date instanceof Date ? session.date : new Date(session.date),
-        }));
+        // Ensure all session dates are Date objects and filter out invalid ones
+        const normalizedSessions = sessions
+          .filter(session => session.date) // Filter out sessions without date
+          .map(session => {
+            try {
+              const dateObj = session.date instanceof Date ? session.date : new Date(session.date);
+              if (isNaN(dateObj.getTime())) return null;
+              return {
+                ...session,
+                date: dateObj,
+              };
+            } catch (error) {
+              return null;
+            }
+          })
+          .filter(session => session !== null) as WorkoutSession[];
 
         // Calculate total stats
         const totalWorkouts = normalizedSessions.length;
@@ -145,11 +183,22 @@ export const useProgressStore = create<ProgressStore>()(
       getWeeklyStats: () => {
         const { sessions } = get();
         
-        // Ensure all session dates are Date objects
-        const normalizedSessions = sessions.map(session => ({
-          ...session,
-          date: session.date instanceof Date ? session.date : new Date(session.date),
-        }));
+        // Ensure all session dates are Date objects and filter out invalid ones
+        const normalizedSessions = sessions
+          .filter(session => session.date) // Filter out sessions without date
+          .map(session => {
+            try {
+              const dateObj = session.date instanceof Date ? session.date : new Date(session.date);
+              if (isNaN(dateObj.getTime())) return null;
+              return {
+                ...session,
+                date: dateObj,
+              };
+            } catch (error) {
+              return null;
+            }
+          })
+          .filter(session => session !== null) as WorkoutSession[];
         
         const weekStart = new Date();
         weekStart.setHours(0, 0, 0, 0);
@@ -168,6 +217,21 @@ export const useProgressStore = create<ProgressStore>()(
           totalDuration: weeklySessions.reduce((sum, session) => sum + session.duration, 0) / 60,
           totalCalories: weeklySessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0),
         };
+      },
+
+      resetStore: () => {
+        set({
+          sessions: [],
+          bodyStats: [],
+          progress: {
+            totalWorkouts: 0,
+            totalDuration: 0,
+            totalCalories: 0,
+            streakDays: 0,
+            weeklyGoal: 3,
+            weeklyProgress: 0,
+          },
+        });
       },
     }),
     {

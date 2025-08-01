@@ -1,16 +1,20 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
-import { Card } from '../../src/components/ui';
+import { Card, Button } from '../../src/components/ui';
 import { colors, spacing, typography } from '../../src/theme';
 import { useProgressStore } from '../../src/store/progressStore';
 import { useNutritionStore } from '../../src/store/nutritionStore';
 
 const { width } = Dimensions.get('window');
 
+
+
 export default function ProgressScreen() {
+  const router = useRouter();
   const { progress, sessions, getWeeklyStats } = useProgressStore();
   const { getTodayNutrition } = useNutritionStore();
   const weeklyStats = getWeeklyStats();
@@ -38,6 +42,8 @@ export default function ProgressScreen() {
     });
   };
 
+
+  
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -218,6 +224,31 @@ export default function ProgressScreen() {
               </View>
             </View>
           </Card>
+        </View>
+
+        {/* Progress Navigation */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Track Progress</Text>
+          
+          <View style={styles.navigationGrid}>
+            <TouchableOpacity
+              style={styles.navigationCard}
+              onPress={() => router.push('/(tabs)/progress/body-stats')}
+            >
+              <Ionicons name="body" size={32} color={colors.primary[500]} />
+              <Text style={styles.navigationTitle}>Body Stats</Text>
+              <Text style={styles.navigationSubtitle}>Weight, measurements, BMI</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.navigationCard}
+              onPress={() => {}}
+            >
+              <Ionicons name="analytics" size={32} color={colors.secondary[500]} />
+              <Text style={styles.navigationTitle}>Workout Analytics</Text>
+              <Text style={styles.navigationSubtitle}>Personal bests, trends</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Recent Sessions */}
@@ -531,5 +562,35 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: colors.primary[500],
     borderRadius: 4,
+  },
+  // Navigation Styles
+  navigationGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  navigationCard: {
+    width: '48%',
+    backgroundColor: colors.background.light,
+    borderRadius: 12,
+    padding: spacing.lg,
+    alignItems: 'center',
+    shadowColor: colors.text.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  navigationTitle: {
+    fontSize: typography.fontSizes.lg,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  navigationSubtitle: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.normal,
+    color: colors.text.secondary,
+    textAlign: 'center',
   },
 }); 
