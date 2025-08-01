@@ -53,6 +53,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         const workoutStore = useWorkoutStore.getState();
         
         try {
+          // Clear local data before syncing from database
+          progressStore.clearAllData();
+          nutritionStore.resetNutritionData();
+          workoutStore.clearAllData();
+          
           await dataSyncService.syncAllData(response.user.id, {
             onWorkoutSessions: (sessions) => {
               progressStore.sessions = sessions;
