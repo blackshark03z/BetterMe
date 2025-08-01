@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { dataSyncService } from '../services/dataSync';
 
 interface WorkoutSession {
   id: string;
@@ -50,6 +51,8 @@ interface ProgressStore {
     totalCalories: number;
   };
   resetStore: () => void;
+  clearAllData: () => void;
+  // Removed syncWithDatabase and uploadToDatabase to avoid require cycles
 }
 
 export const useProgressStore = create<ProgressStore>()(
@@ -79,6 +82,18 @@ export const useProgressStore = create<ProgressStore>()(
 
         // Update progress after adding session
         get().updateProgress();
+        
+        // Upload to database if user is authenticated
+        try {
+          const { useAuthStore } = require('./authStore');
+          const authStore = useAuthStore.getState();
+          if (authStore.user?.id) {
+            // Upload workout session to database
+            dataSyncService.uploadWorkoutSession(authStore.user.id, newSession);
+          }
+        } catch (error) {
+          console.log('Auth store not available for upload');
+        }
       },
 
       addBodyStats: (statsData) => {
@@ -90,6 +105,18 @@ export const useProgressStore = create<ProgressStore>()(
         set((state) => ({
           bodyStats: [...state.bodyStats, newStats],
         }));
+        
+        // Upload to database if user is authenticated
+        try {
+          const { useAuthStore } = require('./authStore');
+          const authStore = useAuthStore.getState();
+          if (authStore.user?.id) {
+            // Upload body stats to database
+            dataSyncService.uploadBodyStats(authStore.user.id, newStats);
+          }
+        } catch (error) {
+          console.log('Auth store not available for upload');
+        }
       },
 
       updateProgress: () => {
@@ -118,6 +145,18 @@ export const useProgressStore = create<ProgressStore>()(
         const totalWorkouts = normalizedSessions.length;
         const totalDuration = normalizedSessions.reduce((sum, session) => sum + session.duration, 0) / 60; // Convert to minutes
         const totalCalories = normalizedSessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0);
+        
+        console.log('ProgressStore Total Stats Debug:', {
+          totalWorkouts,
+          totalDurationInMinutes: totalDuration,
+          totalCalories,
+          sessions: normalizedSessions.map(s => ({
+            exerciseName: s.exerciseName,
+            duration: s.duration, // in seconds
+            durationInMinutes: s.duration / 60,
+            caloriesBurned: s.caloriesBurned,
+          })),
+        });
 
         // Calculate streak - Group sessions by date and count unique days
         const sortedSessions = [...normalizedSessions].sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -140,23 +179,50 @@ export const useProgressStore = create<ProgressStore>()(
           }
         }
 
-        // Calculate weekly progress
-        const weekStart = new Date();
-        weekStart.setHours(0, 0, 0, 0);
-        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        // Calculate weekly progress - Fix timezone issue
+        const now = new Date();
+        const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+
+        console.log('Week calculation:', {
+          now: now.toISOString(),
+          weekStart: weekStart.toISOString(),
+          weekEnd: weekEnd.toISOString(),
+          sessionsCount: normalizedSessions.length,
+        });
 
         // Sửa: Đếm số ngày duy nhất có tập trong tuần
         const workoutsThisWeekSessions = normalizedSessions.filter(session => {
           const sessionDate = new Date(session.date);
-          return sessionDate >= weekStart && sessionDate <= weekEnd;
+          // Compare only date part, ignore time
+          const sessionDateOnly = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+          const weekStartOnly = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+          const weekEndOnly = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate());
+          
+          const isInWeek = sessionDateOnly >= weekStartOnly && sessionDateOnly <= weekEndOnly;
+          console.log('Session check:', {
+            sessionDate: sessionDate.toISOString(),
+            sessionDateOnly: sessionDateOnly.toISOString(),
+            weekStartOnly: weekStartOnly.toISOString(),
+            weekEndOnly: weekEndOnly.toISOString(),
+            isInWeek,
+          });
+          return isInWeek;
         });
         const uniqueWorkoutDays = new Set(workoutsThisWeekSessions.map(s => new Date(s.date).toDateString()));
         const workoutsThisWeek = uniqueWorkoutDays.size;
 
         const { progress } = get();
         const weeklyProgress = Math.min(workoutsThisWeek / progress.weeklyGoal, 1);
+
+        console.log('ProgressStore Debug:', {
+          workoutsThisWeek,
+          weeklyGoal: progress.weeklyGoal,
+          weeklyProgress,
+          totalWorkouts,
+        });
 
         set((state) => ({
           progress: {
@@ -172,67 +238,93 @@ export const useProgressStore = create<ProgressStore>()(
       },
 
       setWeeklyGoal: (goal) => {
+        console.log('Setting weekly goal:', goal);
         set((state) => ({
           progress: {
             ...state.progress,
             weeklyGoal: goal,
           },
         }));
+        // Update progress after setting goal
+        get().updateProgress();
       },
 
-      getWeeklyStats: () => {
-        const { sessions } = get();
-        
-        // Ensure all session dates are Date objects and filter out invalid ones
-        const normalizedSessions = sessions
-          .filter(session => session.date) // Filter out sessions without date
-          .map(session => {
-            try {
-              const dateObj = session.date instanceof Date ? session.date : new Date(session.date);
-              if (isNaN(dateObj.getTime())) return null;
-              return {
-                ...session,
-                date: dateObj,
-              };
-            } catch (error) {
-              return null;
-            }
-          })
-          .filter(session => session !== null) as WorkoutSession[];
-        
-        const weekStart = new Date();
-        weekStart.setHours(0, 0, 0, 0);
-        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
+             getWeeklyStats: () => {
+         const { sessions } = get();
+         
+         // Ensure all session dates are Date objects and filter out invalid ones
+         const normalizedSessions = sessions
+           .filter(session => session.date) // Filter out sessions without date
+           .map(session => {
+             try {
+               const dateObj = session.date instanceof Date ? session.date : new Date(session.date);
+               if (isNaN(dateObj.getTime())) return null;
+               return {
+                 ...session,
+                 date: dateObj,
+               };
+             } catch (error) {
+               return null;
+             }
+           })
+           .filter(session => session !== null) as WorkoutSession[];
+         
+         // Use same logic as updateProgress()
+         const now = new Date();
+         const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+         const weekEnd = new Date(weekStart);
+         weekEnd.setDate(weekEnd.getDate() + 6);
+         weekEnd.setHours(23, 59, 59, 999);
 
-        const weeklySessions = normalizedSessions.filter(session => {
-          const sessionDate = new Date(session.date);
-          return sessionDate >= weekStart && sessionDate <= weekEnd;
-        });
-        // Đếm số ngày duy nhất
-        const uniqueDays = new Set(weeklySessions.map(s => new Date(s.date).toDateString()));
-        return {
-          workoutsThisWeek: uniqueDays.size,
-          totalDuration: weeklySessions.reduce((sum, session) => sum + session.duration, 0) / 60,
-          totalCalories: weeklySessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0),
-        };
-      },
+         const weeklySessions = normalizedSessions.filter(session => {
+           const sessionDate = new Date(session.date);
+           // Compare only date part, ignore time
+           const sessionDateOnly = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+           const weekStartOnly = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+           const weekEndOnly = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate());
+           
+           return sessionDateOnly >= weekStartOnly && sessionDateOnly <= weekEndOnly;
+         });
+         // Đếm số ngày duy nhất
+         const uniqueDays = new Set(weeklySessions.map(s => new Date(s.date).toDateString()));
+         return {
+           workoutsThisWeek: uniqueDays.size,
+           totalDuration: weeklySessions.reduce((sum, session) => sum + session.duration, 0) / 60,
+           totalCalories: weeklySessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0),
+         };
+       },
 
-      resetStore: () => {
-        set({
-          sessions: [],
-          bodyStats: [],
-          progress: {
-            totalWorkouts: 0,
-            totalDuration: 0,
-            totalCalories: 0,
-            streakDays: 0,
-            weeklyGoal: 3,
-            weeklyProgress: 0,
-          },
-        });
-      },
+             resetStore: () => {
+         set({
+           sessions: [],
+           bodyStats: [],
+           progress: {
+             totalWorkouts: 0,
+             totalDuration: 0,
+             totalCalories: 0,
+             streakDays: 0,
+             weeklyGoal: 3,
+             weeklyProgress: 0,
+           },
+         });
+       },
+
+       clearAllData: () => {
+         set({
+           sessions: [],
+           bodyStats: [],
+           progress: {
+             totalWorkouts: 0,
+             totalDuration: 0,
+             totalCalories: 0,
+             streakDays: 0,
+             weeklyGoal: 3,
+             weeklyProgress: 0,
+           },
+         });
+       },
+
+       // Removed syncWithDatabase and uploadToDatabase to avoid require cycles
     }),
     {
       name: 'progress-storage',

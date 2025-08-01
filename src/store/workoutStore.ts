@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from './authStore';
 
 interface Exercise {
   id: string;
@@ -36,6 +37,8 @@ interface WorkoutStore {
   customPlans: CustomWorkoutPlan[];
   addCustomPlan: (plan: Omit<CustomWorkoutPlan, 'id' | 'createdAt'>) => void;
   removeCustomPlan: (planId: string) => void;
+  clearAllData: () => void;
+  // Removed syncWithDatabase and uploadToDatabase to avoid require cycles
 }
 
 export const useWorkoutStore = create<WorkoutStore>()(
@@ -53,6 +56,12 @@ export const useWorkoutStore = create<WorkoutStore>()(
         set((state) => ({
           customPlans: [...state.customPlans, newPlan],
         }));
+        
+        // Upload to database if user is authenticated
+        const authStore = useAuthStore.getState();
+        if (authStore.user?.id) {
+          // Upload handled by authStore
+        }
       },
       
       removeCustomPlan: (planId) => {
@@ -60,6 +69,14 @@ export const useWorkoutStore = create<WorkoutStore>()(
           customPlans: state.customPlans.filter(plan => plan.id !== planId),
         }));
       },
+
+      clearAllData: () => {
+        set({
+          customPlans: [],
+        });
+      },
+
+      // Removed syncWithDatabase and uploadToDatabase to avoid require cycles
     }),
     {
       name: 'workout-storage',

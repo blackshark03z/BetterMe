@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { User } from '@supabase/supabase-js';
 import { AuthService } from '../services/auth';
+import { dataSyncService } from '../services/dataSync';
+import { useProgressStore } from './progressStore';
+import { useNutritionStore } from './nutritionStore';
+import { useWorkoutStore } from './workoutStore';
 
 export interface AuthState {
   user: User | null;
@@ -43,6 +47,48 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const response = await AuthService.signIn(email, password);
       
       if (response.success && response.user) {
+        // Sync data from database for existing user
+        const progressStore = useProgressStore.getState();
+        const nutritionStore = useNutritionStore.getState();
+        const workoutStore = useWorkoutStore.getState();
+        
+        try {
+          await dataSyncService.syncAllData(response.user.id, {
+            onWorkoutSessions: (sessions) => {
+              progressStore.sessions = sessions;
+              progressStore.updateProgress();
+            },
+            onBodyStats: (stats) => {
+              progressStore.bodyStats = stats;
+            },
+            onNutritionMeals: (meals) => {
+              nutritionStore.meals = meals;
+            },
+            onWaterLogs: (logs) => {
+              nutritionStore.waterLogs = logs;
+            },
+            onNutritionGoals: (goals) => {
+              nutritionStore.goals = {
+                dailyCalories: goals.daily_calories,
+                dailyProtein: goals.daily_protein,
+                dailyCarbs: goals.daily_carbs,
+                dailyFat: goals.daily_fat,
+                dailyWater: goals.daily_water,
+              };
+            },
+            onCustomWorkoutPlans: (plans) => {
+              workoutStore.customPlans = plans;
+            },
+          });
+          console.log('✅ Data synced from database');
+        } catch (syncError) {
+          console.error('❌ Error syncing data:', syncError);
+          // Fallback to clear data if sync fails
+          progressStore.clearAllData();
+          nutritionStore.resetNutritionData();
+          workoutStore.clearAllData();
+        }
+        
         set({
           user: response.user,
           isAuthenticated: true,
@@ -76,6 +122,23 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const response = await AuthService.signUp(email, password, userData);
       
       if (response.success && response.user) {
+        // Clear data for new user and upload initial goals
+        const progressStore = useProgressStore.getState();
+        const nutritionStore = useNutritionStore.getState();
+        const workoutStore = useWorkoutStore.getState();
+        
+        progressStore.clearAllData();
+        nutritionStore.resetNutritionData();
+        workoutStore.clearAllData();
+        
+        // Upload initial nutrition goals to database
+        try {
+          await dataSyncService.uploadNutritionGoals(response.user.id, nutritionStore.goals);
+          console.log('✅ Initial data uploaded to database');
+        } catch (uploadError) {
+          console.error('❌ Error uploading initial data:', uploadError);
+        }
+        
         set({
           user: response.user,
           isAuthenticated: true,
@@ -106,6 +169,28 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
+      // Upload all data to database before signing out
+      const currentUser = get().user;
+      if (currentUser) {
+        const progressStore = useProgressStore.getState();
+        const nutritionStore = useNutritionStore.getState();
+        const workoutStore = useWorkoutStore.getState();
+        
+        try {
+          await dataSyncService.uploadAllData(currentUser.id, {
+            workoutSessions: progressStore.sessions,
+            bodyStats: progressStore.bodyStats,
+            nutritionMeals: nutritionStore.meals,
+            nutritionWaterLogs: nutritionStore.waterLogs,
+            nutritionGoals: nutritionStore.goals,
+            customWorkoutPlans: workoutStore.customPlans,
+          });
+          console.log('✅ All data uploaded before sign out');
+        } catch (uploadError) {
+          console.error('❌ Error uploading data before sign out:', uploadError);
+        }
+      }
+      
       const response = await AuthService.signOut();
       
       if (response.success) {

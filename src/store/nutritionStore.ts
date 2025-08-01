@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from './authStore';
 
 export interface Meal {
   id: string;
@@ -221,6 +222,7 @@ export const useNutritionStore = create<NutritionData & {
     priority: number;
   })[];
   resetNutritionData: () => void;
+  // Removed syncWithDatabase and uploadToDatabase to avoid require cycles
 }>()(
   persist(
     (set, get) => ({
@@ -243,6 +245,12 @@ export const useNutritionStore = create<NutritionData & {
         set((state) => ({
           meals: [...state.meals, newMeal],
         }));
+        
+        // Upload to database if user is authenticated
+        const authStore = useAuthStore.getState();
+        if (authStore.user?.id) {
+          // Upload handled by authStore
+        }
       },
 
       updateMeal: (id, updates) => {
@@ -268,12 +276,24 @@ export const useNutritionStore = create<NutritionData & {
         set((state) => ({
           waterLogs: [...state.waterLogs, newWaterLog],
         }));
+        
+        // Upload to database if user is authenticated
+        const authStore = useAuthStore.getState();
+        if (authStore.user?.id) {
+          // Upload handled by authStore
+        }
       },
 
       updateGoals: (newGoals) => {
         set((state) => ({
           goals: { ...state.goals, ...newGoals },
         }));
+        
+        // Upload to database if user is authenticated
+        const authStore = useAuthStore.getState();
+        if (authStore.user?.id) {
+          // Upload handled by authStore
+        }
       },
 
       getTodayNutrition: () => {
@@ -395,6 +415,8 @@ export const useNutritionStore = create<NutritionData & {
           },
         }));
       },
+
+      // Removed syncWithDatabase and uploadToDatabase to avoid require cycles
     }),
     {
       name: 'nutrition-storage',

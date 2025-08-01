@@ -48,6 +48,7 @@ export default function WorkoutSessionScreen() {
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [workoutTime, setWorkoutTime] = useState(0);
   const [restTime, setRestTime] = useState(0);
+  const [totalWorkoutTime, setTotalWorkoutTime] = useState(0); // Accumulated time for exercise
   const [isWorkoutTimerRunning, setIsWorkoutTimerRunning] = useState(false);
   const [isRestTimerRunning, setIsRestTimerRunning] = useState(false);
   const [currentSet, setCurrentSet] = useState(1);
@@ -211,6 +212,10 @@ export default function WorkoutSessionScreen() {
     const newCompletedSets = completedSets + 1;
     setCompletedSets(newCompletedSets);
     
+    // Add current set time to total
+    const currentSetTime = workoutTime + restTime;
+    setTotalWorkoutTime(prev => prev + currentSetTime);
+    
     if (newCompletedSets >= currentExercise.sets) {
       // Exercise completed - show next exercise dialog
       handleExerciseCompleted();
@@ -219,12 +224,14 @@ export default function WorkoutSessionScreen() {
     
     setCurrentSet(prev => prev + 1);
     
-    // Reset both timers
+    // Reset both timers for next set
     setIsWorkoutTimerRunning(false);
     setIsRestTimerRunning(false);
     setWorkoutTime(0);
     setRestTime(0);
   };
+
+
 
   const handleExerciseCompleted = () => {
     const isLastExercise = session && session.currentExerciseIndex >= session.exercises.length - 1;
@@ -234,15 +241,46 @@ export default function WorkoutSessionScreen() {
       const currentExercise = session.exercises[session.currentExerciseIndex];
       const planName = params.planName as string;
       
-      addSession({
-        planName,
-        exerciseName: currentExercise.name,
-        duration: workoutTime,
-        sets: currentExercise.sets,
-        reps: currentExercise.reps,
-        completedSets: currentExercise.sets, // Always save the total sets as completed
-        caloriesBurned: Math.round(workoutTime * 0.1), // Simple calorie calculation
+      // Use accumulated total time for the exercise
+      const finalTotalTime = totalWorkoutTime + workoutTime + restTime; // Include current set if timer is running
+      
+      console.log('Timer Debug:', {
+        workoutTime,
+        restTime,
+        totalWorkoutTime,
+        finalTotalTime,
+        isWorkoutTimerRunning,
+        isRestTimerRunning
       });
+      
+      // Only save session if timer was actually used
+      if (finalTotalTime > 0) {
+        // Calculate calories based on exercise intensity and duration
+        const caloriesPerMinute = 8; // Average calories burned per minute during workout
+        const totalCalories = Math.round((finalTotalTime / 60) * caloriesPerMinute);
+        
+        console.log('Workout Session Debug:', {
+          exerciseName: currentExercise.name,
+          sets: currentExercise.sets,
+          workoutTime, // current set workout time
+          restTime, // current set rest time
+          totalWorkoutTime, // accumulated time from previous sets
+          finalTotalTime, // total time for entire exercise
+          totalCalories,
+        });
+        
+        addSession({
+          planName,
+          exerciseName: currentExercise.name,
+          duration: finalTotalTime, // Total time for entire exercise
+          sets: currentExercise.sets,
+          reps: currentExercise.reps,
+          completedSets: currentExercise.sets, // Always save the total sets as completed
+          caloriesBurned: totalCalories,
+        });
+      } else {
+        console.log('No timer used - session not saved');
+      }
     }
     
     if (isLastExercise) {

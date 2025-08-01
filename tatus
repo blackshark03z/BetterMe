@@ -1,0 +1,179 @@
+[1mdiff --git a/app/(tabs)/_layout.tsx b/app/(tabs)/_layout.tsx[m
+[1mindex 0f5e377..8f39b85 100644[m
+[1m--- a/app/(tabs)/_layout.tsx[m
+[1m+++ b/app/(tabs)/_layout.tsx[m
+[36m@@ -71,6 +71,36 @@[m [mexport default function TabLayout() {[m
+           href: null,[m
+         }}[m
+       />[m
+[32m+[m[32m      <Tabs.Screen[m
+[32m+[m[32m        name="progress/body-stats"[m
+[32m+[m[32m        options={{[m
+[32m+[m[32m          href: null,[m
+[32m+[m[32m        }}[m
+[32m+[m[32m      />[m
+[32m+[m[32m      <Tabs.Screen[m
+[32m+[m[32m        name="profile/edit"[m
+[32m+[m[32m        options={{[m
+[32m+[m[32m          href: null,[m
+[32m+[m[32m        }}[m
+[32m+[m[32m      />[m
+[32m+[m[32m      <Tabs.Screen[m
+[32m+[m[32m        name="profile/goals"[m
+[32m+[m[32m        options={{[m
+[32m+[m[32m          href: null,[m
+[32m+[m[32m        }}[m
+[32m+[m[32m      />[m
+[32m+[m[32m      <Tabs.Screen[m
+[32m+[m[32m        name="profile/notifications"[m
+[32m+[m[32m        options={{[m
+[32m+[m[32m          href: null,[m
+[32m+[m[32m        }}[m
+[32m+[m[32m      />[m
+[32m+[m[32m      <Tabs.Screen[m
+[32m+[m[32m        name="profile/security"[m
+[32m+[m[32m        options={{[m
+[32m+[m[32m          href: null,[m
+[32m+[m[32m        }}[m
+[32m+[m[32m      />[m
+       <Tabs.Screen[m
+         name="nutrition/index"[m
+         options={{[m
+[1mdiff --git a/app/(tabs)/index.tsx b/app/(tabs)/index.tsx[m
+[1mindex bf1ccde..1df702d 100644[m
+[1m--- a/app/(tabs)/index.tsx[m
+[1m+++ b/app/(tabs)/index.tsx[m
+[36m@@ -2,23 +2,95 @@[m [mimport React from 'react';[m
+ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';[m
+ import { SafeAreaView } from 'react-native-safe-area-context';[m
+ import { Ionicons } from '@expo/vector-icons';[m
+[32m+[m[32mimport { useRouter } from 'expo-router';[m
+ import { Card } from '../../src/components/ui';[m
+ import { colors, spacing, typography } from '../../src/theme';[m
+[31m-import { runAllTests } from '../../src/utils/test-database';[m
+[32m+[m[32mimport { useAuthStore } from '../../src/store/authStore';[m
+[32m+[m[32mimport { useProgressStore } from '../../src/store/progressStore';[m
+[32m+[m[32mimport { useNutritionStore } from '../../src/store/nutritionStore';[m
+ [m
+ export default function HomeScreen() {[m
+[31m-  const handleTestDatabase = async () => {[m
+[32m+[m[32m  const router = useRouter();[m
+[32m+[m[32m  const { user } = useAuthStore();[m
+[32m+[m[32m  const { sessions, bodyStats } = useProgressStore();[m
+[32m+[m[32m  const { meals, waterLogs } = useNutritionStore();[m
+[32m+[m
+[32m+[m[32m  // Calculate real stats[m
+[32m+[m[32m  const totalWorkouts = sessions.length;[m
+[32m+[m[32m  const totalCalories = meals.reduce((sum, meal) => sum + meal.calories, 0);[m
+[32m+[m[32m  const currentStreak = calculateStreak(sessions);[m
+[32m+[m[32m  const totalWater = waterLogs.reduce((sum, log) => sum + log.amount, 0);[m
+[32m+[m[32m  const latestWeight = bodyStats.length > 0 ? bodyStats[bodyStats.length - 1].weight : null;[m
+[32m+[m
+[32m+[m[32m  function formatDate(date: Date | string | undefined) {[m
+[32m+[m[32m    if (!date) return '';[m
+[32m+[m[41m    [m
+     try {[m
+[31m-      console.log('🧪 Testing database connection...');[m
+[31m-      const success = await runAllTests();[m
+[31m-      if (success) {[m
+[31m-        alert('✅ Database connection successful!');[m
+[32m+[m[32m      const dateObj = typeof date === 'string' ? new Date(date) : date;[m
+[32m+[m[32m      if (isNaN(dateObj.getTime())) return '';[m
+[32m+[m[41m      [m
+[32m+[m[32m      return dateObj.toLocaleDateString();[m
+[32m+[m[32m    } catch (error) {[m
+[32m+[m[32m      return '';[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  function calculateStreak(sessions: any[]) {[m
+[32m+[m[32m    if (sessions.length === 0) return 0;[m
+[32m+[m[41m    [m
+[32m+[m[32m    const today = new Date();[m
+[32m+[m[32m    const dates = sessions[m
+[32m+[m[32m      .filter(s => s.date) // Filter out sessions without date[m
+[32m+[m[32m      .map(s => {[m
+[32m+[m[32m        try {[m
+[32m+[m[32m          const dateObj = typeof s.date === 'string' ? new Date(s.date) : s.date;[m
+[32m+[m[32m          if (isNaN(dateObj.getTime())) return null;[m
+[32m+[m[32m          return dateObj.toDateString();[m
+[32m+[m[32m        } catch (error) {[m
+[32m+[m[32m          return null;[m
+[32m+[m[32m        }[m
+[32m+[m[32m      })[m
+[32m+[m[32m      .filter(date => date !== null); // Remove invalid dates[m
+[32m+[m[41m    [m
+[32m+[m[32m    const uniqueDates = [...new Set(dates)];[m
+[32m+[m[41m    [m
+[32m+[m[32m    let streak = 0;[m
+[32m+[m[32m    let currentDate = new Date(today);[m
+[32m+[m[41m    [m
+[32m+[m[32m    while (true) {[m
+[32m+[m[32m      const dateString = currentDate.toDateString();[m
+[32m+[m[32m      if (uniqueDates.includes(dateString)) {[m
+[32m+[m[32m        streak++;[m
+[32m+[m[32m        currentDate.setDate(currentDate.getDate() - 1);[m
+       } else {[m
+[31m-        alert('❌ Database connection failed. Check console for details.');[m
+[32m+[m[32m        break;[m
+       }[m
+[31m-    } catch (error) {[m
+[31m-      console.error('Test failed:', error);[m
+[31m-      alert('❌ Test failed: ' + error);[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    return streak;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const getGreeting = () => {[m
+[32m+[m[32m    const hour = new Date().getHours();[m
+[32m+[m[32m    if (hour < 12) return 'Good Morning';[m
+[32m+[m[32m    if (hour < 18) return 'Good Afternoon';[m
+[32m+[m[32m    return 'Good Evening';[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const handleQuickAction = (action: string) => {[m
+[32m+[m[32m    switch (action) {[m
+[32m+[m[32m      case 'workout':[m
+[32m+[m[32m        router.push('/(tabs)/workout');[m
+[32m+[m[32m        break;[m
+[32m+[m[32m      case 'nutrition':[m
+[32m+[m[32m        router.push('/(tabs)/nutrition');[m
+[32m+[m[32m        break;[m
+[32m+[m[32m      case 'progress':[m
+[32m+[m[32m        router.push('/(tabs)/progress');[m
+[32m+[m[32m        break;[m
+[32m+[m[32m      case 'body-stats':[m
+[32m+[m[32m        router.push('/(tabs)/progress/body-stats');[m
+[32m+[m[32m        break;[m
+     }[m
+   };[m
+ [m
+[36m@@ -27,92 +99,142 @@[m [mexport default function HomeScreen() {[m
+       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>[m
+         {/* Header */}[m
+         <View style={styles.header}>[m
+[31m-          <Text style={styles.title}>BetterMe</Text>[m
+[31m-          <TouchableOpacity style={styles.addButton}>[m
+[31m-            <Ionicons name="add" size={24} color={colors.primary[500]} />[m
+[31m-          </TouchableOpacity>[m
+[32m+[m[32m          <View>[m
+[32m+[m[32m            <Text style={styles.greeting}>{getGreeting()}</Text>[m
+[32m+[m[32m            <Text style={styles.userName}>[m
+[32m+[m[32m              {user?.user_metadata?.full_name || 'User'}[m
+[32m+[m[32m            </Text>[m
+[32m+[m[32m          </View>[m
+[32m+[m[32m                     <TouchableOpacity style={styles.profileButton}>[m
+[32m+[m[32m             <Ionicons name="person-circle" size={32} color={colors.primary[500]} />[m
+[32m+[m[32m           </TouchableOpacity>[m
+         </View>[m
+ [m
+[31m-        {/* Quick Stats */}[m
+[31m-        <Card variant="elevated" padding="md" style={styles.statsCard}>[m
+[31m-          <View style={styles.statsRow}>[m
+[31m-            <View style={styles.statItem}>[m
+[31m-              <Text style={styles.statValue}>3</Text>[m
+[31m-              <Text style={styles.statLabel}>This Week</Text>[m
+[32m+[m[32m        {/* Today's Summary */}[m
+[32m+[m[32m        <Card variant="elevated" padding="lg" style={styles.summaryCard}>[m
+[32m+[m[32m          <Text 

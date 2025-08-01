@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,10 +15,25 @@ const { width } = Dimensions.get('window');
 
 export default function ProgressScreen() {
   const router = useRouter();
-  const { progress, sessions, getWeeklyStats } = useProgressStore();
+  const { progress, sessions, getWeeklyStats, updateProgress } = useProgressStore();
   const { getTodayNutrition } = useNutritionStore();
+  
+  // Update progress when component mounts
+  useEffect(() => {
+    updateProgress();
+  }, [updateProgress]);
+  
   const weeklyStats = getWeeklyStats();
   const nutrition = getTodayNutrition();
+  
+  // Debug logs
+  console.log('Progress Debug:', {
+    weeklyGoal: progress.weeklyGoal,
+    weeklyProgress: progress.weeklyProgress,
+    workoutsThisWeek: weeklyStats.workoutsThisWeek,
+    totalWorkouts: progress.totalWorkouts,
+    calculatedProgress: (weeklyStats.workoutsThisWeek / progress.weeklyGoal) * 100,
+  });
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -102,13 +117,23 @@ export default function ProgressScreen() {
               <Text style={styles.weeklyProgress}>
                 {weeklyStats.workoutsThisWeek} / {progress.weeklyGoal} workouts
               </Text>
+              <TouchableOpacity 
+                style={styles.testButton}
+                onPress={() => {
+                  const { setWeeklyGoal } = useProgressStore.getState();
+                  setWeeklyGoal(5);
+                  updateProgress();
+                }}
+              >
+                <Text style={styles.testButtonText}>Test: Set 5</Text>
+              </TouchableOpacity>
             </View>
             
             <View style={styles.progressBar}>
               <View 
                 style={[
                   styles.progressFill, 
-                  { width: `${progress.weeklyProgress * 100}%` }
+                  { width: `${Math.min((weeklyStats.workoutsThisWeek / progress.weeklyGoal) * 100, 100)}%` }
                 ]} 
               />
             </View>
@@ -584,13 +609,23 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold,
     color: colors.text.primary,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
   },
   navigationSubtitle: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.normal,
     color: colors.text.secondary,
     textAlign: 'center',
+  },
+  testButton: {
+    backgroundColor: colors.primary[500],
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 6,
+    marginLeft: spacing.sm,
+  },
+  testButtonText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: '#ffffff',
   },
 }); 
