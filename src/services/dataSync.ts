@@ -400,18 +400,23 @@ class DataSyncServiceImpl implements DataSyncService {
     onNutritionGoals?: (goals: any) => void;
     onCustomWorkoutPlans?: (plans: any[]) => void;
   }): Promise<void> {
-    console.log('🔄 Starting full data sync...');
+    console.log('🔄 Starting full data sync for user:', userId);
     
-    await Promise.all([
-      this.syncWorkoutSessions(userId, callbacks.onWorkoutSessions),
-      this.syncBodyStats(userId, callbacks.onBodyStats),
-      this.syncNutritionMeals(userId, callbacks.onNutritionMeals),
-      this.syncWaterLogs(userId, callbacks.onWaterLogs),
-      this.syncNutritionGoals(userId, callbacks.onNutritionGoals),
-      this.syncCustomWorkoutPlans(userId, callbacks.onCustomWorkoutPlans),
-    ]);
-    
-    console.log('✅ Full data sync completed');
+    try {
+      await Promise.all([
+        this.syncWorkoutSessions(userId, callbacks.onWorkoutSessions),
+        this.syncBodyStats(userId, callbacks.onBodyStats),
+        this.syncNutritionMeals(userId, callbacks.onNutritionMeals),
+        this.syncWaterLogs(userId, callbacks.onWaterLogs),
+        this.syncNutritionGoals(userId, callbacks.onNutritionGoals),
+        this.syncCustomWorkoutPlans(userId, callbacks.onCustomWorkoutPlans),
+      ]);
+      
+      console.log('✅ Full data sync completed');
+    } catch (error) {
+      console.error('❌ Error in syncAllData:', error);
+      throw error;
+    }
   }
 
   async uploadAllData(userId: string, data: {
