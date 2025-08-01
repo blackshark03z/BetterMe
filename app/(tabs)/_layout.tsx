@@ -66,6 +66,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="nutrition/smart-recommendations"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="nutrition/index"
         options={{
           title: 'Nutrition',

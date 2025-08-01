@@ -209,6 +209,18 @@ export const useNutritionStore = create<NutritionData & {
   };
   getMealsByType: (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => Meal[];
   getRecommendedMeals: (goal: 'weight_loss' | 'muscle_gain' | 'maintenance', mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack') => RecommendedMeal[];
+  getNutritionGoals: () => {
+    caloriesRemaining: number;
+    proteinRemaining: number;
+    carbsRemaining: number;
+    fatRemaining: number;
+    waterRemaining: number;
+  };
+  getSmartRecommendations: (mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack') => (RecommendedMeal & {
+    suggestedServing: number;
+    priority: number;
+  })[];
+  resetNutritionData: () => void;
 }>()(
   persist(
     (set, get) => ({
@@ -318,6 +330,70 @@ export const useNutritionStore = create<NutritionData & {
         }
         
         return filteredMeals;
+      },
+
+      getNutritionGoals: () => {
+        const { goals } = get();
+        const todayNutrition = get().getTodayNutrition();
+        
+        return {
+          caloriesRemaining: Math.max(0, goals.dailyCalories - todayNutrition.totalCalories),
+          proteinRemaining: Math.max(0, goals.dailyProtein - todayNutrition.totalProtein),
+          carbsRemaining: Math.max(0, goals.dailyCarbs - todayNutrition.totalCarbs),
+          fatRemaining: Math.max(0, goals.dailyFat - todayNutrition.totalFat),
+          waterRemaining: Math.max(0, goals.dailyWater - todayNutrition.totalWater),
+        };
+      },
+
+      getSmartRecommendations: (mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+        const { goals } = get();
+        const nutritionGoals = get().getNutritionGoals();
+        const todayNutrition = get().getTodayNutrition();
+        
+        // Determine user's goal based on current nutrition status
+        let userGoal: 'weight_loss' | 'muscle_gain' | 'maintenance' = 'maintenance';
+        
+        if (todayNutrition.calorieProgress < 70) {
+          userGoal = 'weight_loss';
+        } else if (todayNutrition.calorieProgress > 90) {
+          userGoal = 'muscle_gain';
+        }
+        
+        // Get recommended meals for the goal
+        let recommendations = get().getRecommendedMeals(userGoal, mealType);
+        
+        // Filter and sort by nutritional needs
+        recommendations = recommendations.map(meal => {
+          const servingRatio = Math.min(
+            nutritionGoals.caloriesRemaining / meal.calories,
+            nutritionGoals.proteinRemaining / meal.protein,
+            nutritionGoals.carbsRemaining / meal.carbs,
+            nutritionGoals.fatRemaining / meal.fat
+          );
+          
+          return {
+            ...meal,
+            suggestedServing: Math.max(0.5, Math.min(2, servingRatio)),
+            priority: servingRatio > 0 ? servingRatio : 0,
+          };
+        }).filter(meal => meal.priority > 0)
+          .sort((a, b) => b.priority - a.priority);
+        
+        return recommendations.slice(0, 5); // Return top 5 recommendations
+      },
+
+      resetNutritionData: () => {
+        set(() => ({
+          meals: [],
+          waterLogs: [],
+          goals: {
+            dailyCalories: 2000,
+            dailyProtein: 150,
+            dailyCarbs: 200,
+            dailyFat: 65,
+            dailyWater: 2500,
+          },
+        }));
       },
     }),
     {

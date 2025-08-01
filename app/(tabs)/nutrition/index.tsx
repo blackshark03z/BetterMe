@@ -17,7 +17,7 @@ const WATER_AMOUNTS = [
 
 export default function NutritionIndexScreen() {
   const router = useRouter();
-  const { goals, getTodayNutrition, getMealsByType, addWaterLog } = useNutritionStore();
+  const { goals, getTodayNutrition, getMealsByType, addWaterLog, resetNutritionData } = useNutritionStore();
   const nutrition = getTodayNutrition();
 
   const handleLogMeal = (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
@@ -33,6 +33,28 @@ export default function NutritionIndexScreen() {
 
   const handleRecommendedMeals = () => {
     router.push('/(tabs)/nutrition/recommended-meals');
+  };
+
+  const handleSmartRecommendations = () => {
+    router.push('/(tabs)/nutrition/smart-recommendations');
+  };
+
+  const handleResetData = () => {
+    Alert.alert(
+      'Reset Nutrition Data',
+      'This will clear all meals and water logs for today. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            resetNutritionData();
+            Alert.alert('Success', 'Nutrition data has been reset!');
+          },
+        },
+      ]
+    );
   };
 
   const handleAddWater = (amount: number) => {
@@ -173,7 +195,7 @@ export default function NutritionIndexScreen() {
           <View style={styles.progressSection}>
             <Text style={styles.progressLabel}>Calories Progress</Text>
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${nutrition.calorieProgress}%` }]} />
+              <View style={[styles.progressFill, { width: `${Math.min(nutrition.calorieProgress, 100)}%` }]} />
             </View>
             <Text style={styles.progressText}>
               {nutrition.totalCalories} / {goals.dailyCalories} calories ({nutrition.calorieProgress.toFixed(0)}%)
@@ -274,10 +296,22 @@ export default function NutritionIndexScreen() {
               icon="star-outline"
             />
             <Button 
+              title="Smart Recs" 
+              onPress={handleSmartRecommendations} 
+              style={styles.actionButton}
+              icon="bulb-outline"
+            />
+            <Button 
               title="Scan Barcode" 
               onPress={() => {}} 
               style={styles.actionButton}
               icon="barcode-outline"
+            />
+            <Button 
+              title="Reset Data" 
+              onPress={handleResetData} 
+              style={styles.actionButton}
+              icon="refresh-outline"
             />
           </View>
         </View>
