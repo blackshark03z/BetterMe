@@ -46,12 +46,7 @@ export default function TabLayout() {
           },
         }}
       />
-      <Tabs.Screen
-        name="workout/index"
-        options={{
-          href: null,
-        }}
-      />
+
       <Tabs.Screen
         name="nutrition/log-meal"
         options={{
@@ -66,36 +61,6 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="nutrition/recommended-meals"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="workout/exercise-detail"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="workout/session"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="workout/create-plan"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="workout/add-days"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="workout/add-exercises"
         options={{
           href: null,
         }}
