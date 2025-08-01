@@ -261,13 +261,13 @@ class DataSyncServiceImpl implements DataSyncService {
           name: meal.name,
           description: meal.description,
           serving_weight: meal.servingWeight || 100, // Default to 100g if not provided
-          calories: meal.calories,
-          protein: meal.protein,
-          carbs: meal.carbs,
-          fat: meal.fat,
-          fiber: meal.fiber,
-          sugar: meal.sugar,
-          sodium: meal.sodium,
+          calories: Math.round(meal.calories || 0), // Convert to integer
+          protein: Math.round(meal.protein || 0), // Convert to integer
+          carbs: Math.round(meal.carbs || 0), // Convert to integer
+          fat: Math.round(meal.fat || 0), // Convert to integer
+          fiber: Math.round(meal.fiber || 0), // Convert to integer
+          sugar: Math.round(meal.sugar || 0), // Convert to integer
+          sodium: Math.round(meal.sodium || 0), // Convert to integer
           meal_type: meal.mealType,
           logged_at: meal.loggedAt.toISOString(),
         });
@@ -304,15 +304,21 @@ class DataSyncServiceImpl implements DataSyncService {
 
   async uploadNutritionGoals(userId: string, goals: any): Promise<void> {
     try {
+      // First try to delete existing goals to avoid duplicate key error
+      await supabase
+        .from('nutrition_goals')
+        .delete()
+        .eq('user_id', userId);
+
       const { error } = await supabase
         .from('nutrition_goals')
-        .upsert({
+        .insert({
           user_id: userId,
-          daily_calories: goals.dailyCalories,
-          daily_protein: goals.dailyProtein,
-          daily_carbs: goals.dailyCarbs,
-          daily_fat: goals.dailyFat,
-          daily_water: goals.dailyWater,
+          daily_calories: Math.round(goals.dailyCalories || 0),
+          daily_protein: Math.round(goals.dailyProtein || 0),
+          daily_carbs: Math.round(goals.dailyCarbs || 0),
+          daily_fat: Math.round(goals.dailyFat || 0),
+          daily_water: Math.round(goals.dailyWater || 0),
         });
 
       if (error) {
