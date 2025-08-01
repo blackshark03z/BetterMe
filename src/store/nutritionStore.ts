@@ -6,6 +6,7 @@ export interface Meal {
   id: string;
   name: string;
   description?: string;
+  servingWeight: number; // in grams
   calories: number;
   protein: number;
   carbs: number;

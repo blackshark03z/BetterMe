@@ -70,13 +70,19 @@ export const useProgressStore = create<ProgressStore>()(
         
         if (sessions.length === 0) return;
 
+        // Ensure all session dates are Date objects
+        const normalizedSessions = sessions.map(session => ({
+          ...session,
+          date: session.date instanceof Date ? session.date : new Date(session.date),
+        }));
+
         // Calculate total stats
-        const totalWorkouts = sessions.length;
-        const totalDuration = sessions.reduce((sum, session) => sum + session.duration, 0) / 60; // Convert to minutes
-        const totalCalories = sessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0);
+        const totalWorkouts = normalizedSessions.length;
+        const totalDuration = normalizedSessions.reduce((sum, session) => sum + session.duration, 0) / 60; // Convert to minutes
+        const totalCalories = normalizedSessions.reduce((sum, session) => sum + (session.caloriesBurned || 0), 0);
 
         // Calculate streak - Group sessions by date and count unique days
-        const sortedSessions = [...sessions].sort((a, b) => b.date.getTime() - a.date.getTime());
+        const sortedSessions = [...normalizedSessions].sort((a, b) => b.date.getTime() - a.date.getTime());
         let streakDays = 0;
         let currentDate = new Date();
         const processedDates = new Set<string>();
@@ -104,7 +110,7 @@ export const useProgressStore = create<ProgressStore>()(
         weekEnd.setDate(weekEnd.getDate() + 6);
 
         // Sửa: Đếm số ngày duy nhất có tập trong tuần
-        const workoutsThisWeekSessions = sessions.filter(session => {
+        const workoutsThisWeekSessions = normalizedSessions.filter(session => {
           const sessionDate = new Date(session.date);
           return sessionDate >= weekStart && sessionDate <= weekEnd;
         });
@@ -138,13 +144,20 @@ export const useProgressStore = create<ProgressStore>()(
 
       getWeeklyStats: () => {
         const { sessions } = get();
+        
+        // Ensure all session dates are Date objects
+        const normalizedSessions = sessions.map(session => ({
+          ...session,
+          date: session.date instanceof Date ? session.date : new Date(session.date),
+        }));
+        
         const weekStart = new Date();
         weekStart.setHours(0, 0, 0, 0);
         weekStart.setDate(weekStart.getDate() - weekStart.getDay());
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
 
-        const weeklySessions = sessions.filter(session => {
+        const weeklySessions = normalizedSessions.filter(session => {
           const sessionDate = new Date(session.date);
           return sessionDate >= weekStart && sessionDate <= weekEnd;
         });

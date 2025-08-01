@@ -115,7 +115,7 @@ export default function NutritionIndexScreen() {
         {meals.length > 0 ? (
           <>
             <Text style={styles.mealDescription}>
-              {meals.map(meal => meal.name).join(', ')}
+              {meals.map(meal => `${meal.name} (${meal.servingWeight}g)`).join(', ')}
             </Text>
             <View style={styles.mealStats}>
               <Text style={styles.mealStat}>{totalCalories} cal</Text>

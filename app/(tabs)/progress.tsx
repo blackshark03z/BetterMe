@@ -22,8 +22,16 @@ export default function ProgressScreen() {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (date: Date | string | undefined) => {
+    if (!date) return 'Unknown';
+    
+    // Convert string to Date if needed
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if date is valid
+    if (isNaN(dateObj.getTime())) return 'Invalid Date';
+    
+    return dateObj.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
@@ -135,6 +143,10 @@ export default function ProgressScreen() {
 
             <View style={styles.macroGrid}>
               <View style={styles.macroItem}>
+                <View style={styles.macroHeader}>
+                  <Text style={styles.macroLabel}>Protein</Text>
+                  <Text style={styles.macroValue}>{nutrition.totalProtein}g</Text>
+                </View>
                 <View style={styles.macroBar}>
                   <View 
                     style={[
@@ -146,11 +158,13 @@ export default function ProgressScreen() {
                     ]} 
                   />
                 </View>
-                <Text style={styles.macroValue}>{nutrition.totalProtein}g</Text>
-                <Text style={styles.macroLabel}>Protein</Text>
               </View>
               
               <View style={styles.macroItem}>
+                <View style={styles.macroHeader}>
+                  <Text style={styles.macroLabel}>Carbs</Text>
+                  <Text style={styles.macroValue}>{nutrition.totalCarbs}g</Text>
+                </View>
                 <View style={styles.macroBar}>
                   <View 
                     style={[
@@ -162,11 +176,13 @@ export default function ProgressScreen() {
                     ]} 
                   />
                 </View>
-                <Text style={styles.macroValue}>{nutrition.totalCarbs}g</Text>
-                <Text style={styles.macroLabel}>Carbs</Text>
               </View>
               
               <View style={styles.macroItem}>
+                <View style={styles.macroHeader}>
+                  <Text style={styles.macroLabel}>Fat</Text>
+                  <Text style={styles.macroValue}>{nutrition.totalFat}g</Text>
+                </View>
                 <View style={styles.macroBar}>
                   <View 
                     style={[
@@ -178,15 +194,15 @@ export default function ProgressScreen() {
                     ]} 
                   />
                 </View>
-                <Text style={styles.macroValue}>{nutrition.totalFat}g</Text>
-                <Text style={styles.macroLabel}>Fat</Text>
               </View>
             </View>
 
             <View style={styles.waterSection}>
               <View style={styles.waterHeader}>
-                <Ionicons name="water" size={20} color={colors.primary[500]} />
-                <Text style={styles.waterTitle}>Water Intake</Text>
+                <View style={styles.waterTitleContainer}>
+                  <Ionicons name="water" size={20} color={colors.primary[500]} />
+                  <Text style={styles.waterTitle}>Water Intake</Text>
+                </View>
                 <Text style={styles.waterProgress}>
                   {nutrition.totalWater}ml / 2500ml
                 </Text>
@@ -454,18 +470,23 @@ const styles = StyleSheet.create({
   macroItem: {
     marginBottom: spacing.md,
   },
-  macroBar: {
-    height: 6,
-    backgroundColor: colors.border.light,
-    borderRadius: 3,
+  macroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.xs,
+  },
+  macroBar: {
+    height: 8,
+    backgroundColor: colors.border.light,
+    borderRadius: 4,
   },
   macroFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   macroValue: {
-    fontSize: typography.fontSizes.md,
+    fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
     color: colors.text.primary,
   },
@@ -476,6 +497,9 @@ const styles = StyleSheet.create({
   },
   waterSection: {
     marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
   },
   waterHeader: {
     flexDirection: 'row',
@@ -483,9 +507,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
+  waterTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   waterTitle: {
     fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.normal,
+    fontWeight: typography.fontWeights.medium,
     color: colors.text.primary,
     marginLeft: spacing.xs,
   },
@@ -495,13 +523,13 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   waterProgressBar: {
-    height: 6,
+    height: 8,
     backgroundColor: colors.border.light,
-    borderRadius: 3,
+    borderRadius: 4,
   },
   waterProgressFill: {
     height: '100%',
     backgroundColor: colors.primary[500],
-    borderRadius: 3,
+    borderRadius: 4,
   },
 }); 

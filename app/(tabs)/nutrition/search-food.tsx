@@ -163,6 +163,7 @@ export default function SearchFoodScreen() {
         prefillData: JSON.stringify({
           name: food.name,
           description: `${food.brand ? food.brand + ' - ' : ''}${food.servingSize}`,
+          servingWeight: '100', // Default to 100g
           calories: food.calories.toString(),
           protein: food.protein.toString(),
           carbs: food.carbs.toString(),
